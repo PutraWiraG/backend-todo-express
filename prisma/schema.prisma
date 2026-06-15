@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TaskStatus {
+  TO_DO
+  PENDING
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  fullName     String
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  projects     Project[] @relation("ProjectCreator")
+  createdTasks Task[]    @relation("TaskCreator")
+  auditLogs    AuditLog[] @relation("AuditActor")
+
+  @@index([username])
+  @@map("users")
+}
+
+model Project {
+  id           String    @id @default(uuid())
+  name         String
+  description  String?
+
+  createdById  String
+  createdBy    User      @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tasks        Task[]
+
+  @@index([name])
+  @@index([createdById])
+
+  @@map("projects")
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TO_DO)
+
+  deletedAt   DateTime?
+
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  createdById String
+  createdBy   User @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  parentId    String?
+  parent      Task?  @relation("TaskHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children    Task[] @relation("TaskHierarchy")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([createdById])
+  @@index([parentId])
+  @@index([status])
+  @@index([deletedAt])
+
+  @@map("tasks")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String   
+  entityId   String
+  action     String   
+  
+  fromStatus TaskStatus?
+  toStatus   TaskStatus?
+  
+  oldValue   Json?
+  newValue   Json?
+
+  actorId    String
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([entityId, createdAt])
+  @@map("audit_logs")
+}
